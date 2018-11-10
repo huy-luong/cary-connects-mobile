@@ -1,5 +1,7 @@
 exports.createMapView = function (win) {
-
+  // Map bounds
+  var bounds = [[35.773958, -78.798776],
+                [35.796304, -78.761682]];
   // Create the map
   var Map = require('ti.map');
   var mapView = Map.createView({
@@ -23,6 +25,16 @@ exports.createMapView = function (win) {
   });
   win.add(mapView);
 
+  // Acquire first mapCenter coordinate
+  var mapCenter = mapView.center;
+
+  // Adding Listener for Lat and Long change to set map bounds.
+  mapView.addEventListener('regionchanged', function(e){
+
+      console.log("Latitude changed to " + e.latitude);
+      console.log("Longitude changed to " + e.longitude);
+
+  });
   // Add Global Event Listeners
   Ti.App.addEventListener('UpdateParkingLots', function (json) {
     // Updates the parking lots on the map

@@ -19,7 +19,7 @@ function loadParkingLots() {
   exports.retrievePlaces(1);
 }
 
-function processParkingLotRecords (json) {
+function processParkingLotRecords(json) {
   // New data set
   if (json !== undefined && json.features) {
     for (var i = 0; i < json.features.length; i++) {
@@ -37,23 +37,23 @@ function processParkingLotRecords (json) {
   }
 }
 
-exports.retrieveParkingLots = function (pass) {
+exports.retrieveParkingLots = function(pass) {
 
   // Access the parking lots using HTTP client
   var url = "https://raw.githubusercontent.com/CodeForCary/cary-connects-data/master/parking.geojson";
   var client = Ti.Network.createHTTPClient({
-    onload: function (e) {
+    onload: function(e) {
       // @todo cache the file for later
       var json = JSON.parse(this.responseText);
       processParkingLotRecords(json);
       // Call the next data-set
       exports.retrievePlaces(1);
     },
-    onerror: function (e) {
+    onerror: function(e) {
       Ti.API.debug(e.error);
       // Try again
       if (pass <= 2) {
-        setTimeout(function () {
+        setTimeout(function() {
           exports.retrieveParkingLots(pass + 1);
         }, 1000);
         return;
@@ -65,7 +65,7 @@ exports.retrieveParkingLots = function (pass) {
         buttonNames: ['Yes', 'No'],
         cancel: 1
       });
-      dialog.addEventListener('click', function (de) {
+      dialog.addEventListener('click', function(de) {
         if (de.index === de.source.cancel) {
           loadParkingLots();
           return;
@@ -74,7 +74,7 @@ exports.retrieveParkingLots = function (pass) {
       });
       dialog.show();
     },
-    timeout: 5000  // in milliseconds
+    timeout: 5000 // in milliseconds
   });
   client.open("GET", url);
   console.log("Opening connection to: " + url);
@@ -82,7 +82,7 @@ exports.retrieveParkingLots = function (pass) {
 
 };
 
-function processPlaceRecords (json) {
+function processPlaceRecords(json) {
   // New data set
   if (json !== undefined && json.features) {
     for (var i = 0; i < json.features.length; i++) {
@@ -106,21 +106,21 @@ function processPlaceRecords (json) {
   }
 }
 
-exports.retrievePlaces = function (pass) {
+exports.retrievePlaces = function(pass) {
 
   // Access the places using HTTP client
   var url = "https://raw.githubusercontent.com/CodeForCary/cary-connects-data/master/business.geojson";
   var client = Ti.Network.createHTTPClient({
-    onload: function (e) {
+    onload: function(e) {
       // @todo write the file for later use
       var json = JSON.parse(this.responseText);
       processPlaceRecords(json);
     },
-    onerror: function (e) {
+    onerror: function(e) {
       Ti.API.debug(e.error);
       // Try again
       if (pass <= 2) {
-        setTimeout(function () {
+        setTimeout(function() {
           exports.retrievePlaces(pass + 1);
         }, 1000);
         return;
@@ -132,7 +132,7 @@ exports.retrievePlaces = function (pass) {
         buttonNames: ['Yes', 'No'],
         cancel: 1
       });
-      dialog.addEventListener('click', function (de) {
+      dialog.addEventListener('click', function(de) {
         if (de.index === de.source.cancel) {
           // @todo
           // loadPlaces();
@@ -142,7 +142,7 @@ exports.retrievePlaces = function (pass) {
       });
       dialog.show();
     },
-    timeout: 5000  // in milliseconds
+    timeout: 5000 // in milliseconds
   });
   client.open("GET", url);
   console.log("Opening connection to: " + url);
@@ -150,22 +150,82 @@ exports.retrievePlaces = function (pass) {
 
 };
 
+// Levenshtein function, courtesy
+function sift4(s1, s2, maxOffset, maxDistance) {
+  if (!s1||!s1.length) {
+        if (!s2) {
+            return 0;
+        }
+        return s2.length;
+    }
+
+    if (!s2||!s2.length) {
+        return s1.length;
+    }
+
+    var l1=s1.length;
+    var l2=s2.length;
+
+    var c1 = 0;  //cursor for string 1
+    var c2 = 0;  //cursor for string 2
+    var lcss = 0;  //largest common subsequence
+    var local_cs = 0; //local common substring
+
+    while ((c1 < l1) && (c2 < l2)) {
+        if (s1.charAt(c1) == s2.charAt(c2)) {
+            local_cs++;
+        } else {
+            lcss+=local_cs;
+            local_cs=0;
+            if (c1!=c2) {
+                c1=c2=Math.max(c1,c2); //using max to bypass the need for computer transpositions ('ab' vs 'ba')
+            }
+            for (var i = 0; i < maxOffset && (c1+i<l1 || c2+i<l2); i++) {
+                if ((c1 + i < l1) && (s1.charAt(c1 + i) == s2.charAt(c2))) {
+                    c1+= i;
+                    local_cs++;
+                    break;
+                }
+                if ((c2 + i < l2) && (s1.charAt(c1) == s2.charAt(c2 + i))) {
+                    c2+= i;
+                    local_cs++;
+                    break;
+                }
+            }
+        }
+        c1++;
+        c2++;
+    }
+    lcss+=local_cs;
+    return Math.round(Math.max(l1,l2)- lcss);
+}
+
 // Filter function
-var filterProperty = function (place, searchText) {
-  if (!place['name']) {
-    return false;
+var filterProperty = function(place, searchText) {
+   if (!place['name']) {
+     return false;
+   }
+   if (place['name'].toLowerCase().includes(searchText.toLowerCase())) {
+     return true;
+   }
+
+  else{
+    var slicedStr = place['name'].slice(0, searchText.length);
+    // Calculate levenshtein distance and restrict to 3 or lower
+    if ((sift4(searchText.toLowerCase(), slicedStr.toLowerCase(), 5)) <= 3){
+      return true;
+    }
+      return false;
   }
-  if (place['name'].toLowerCase().includes(searchText.toLowerCase())) {
-    return true;
-  }
+
   // Check the filters
   // if (place['marker-symbol'].toLowerCase().includes(searchText.toLowerCase())) {
   //   return true;
   // }
-  return false;
+  //return false;
 };
 
-exports.searchPlaces = function (searchText, maxResults) {
+exports.searchPlaces = function(searchText, maxResults) {
   if (placesArray == null || placesArray.length === 0 || searchText === undefined || searchText.length === 0) {
     console.log("No records to search");
     return [];
@@ -179,35 +239,35 @@ exports.searchPlaces = function (searchText, maxResults) {
     }
   }
   // Sort the results
-  results.sort(function (a, b) {
+   results.sort(function(a, b) {
 
-    var searchTerm = searchText.toLowerCase();
-    var item1 = a.name.toLowerCase();
-    var item2 = b.name.toLowerCase();
+     var searchTerm = searchText.toLowerCase();
+     var item1 = a.name.toLowerCase();
+     var item2 = b.name.toLowerCase();
 
-    // Show 'starts with' first
-    if (item1.indexOf(searchTerm) === 0 &&
-      item2.indexOf(searchTerm) !== 0) {
-      return -1;
-    }
-    if (item1.indexOf(searchTerm) !== 0 &&
-      item2.indexOf(searchTerm) === 0) {
-      return 1;
-    }
-    // Then alphabetical
-    if (item1 < item2) {
-      return -1;
-    }
-    if (item1 > item2) {
-      return 1;
-    }
-    return 0;
-  });
-  // Return the max size
-  if (maxResults) {
-    return results.slice(0, maxResults);
-  }
-  return results;
+     // Show 'starts with' first
+     if (item1.indexOf(searchTerm) === 0 &&
+       item2.indexOf(searchTerm) !== 0) {
+       return -1;
+     }
+     if (item1.indexOf(searchTerm) !== 0 &&
+       item2.indexOf(searchTerm) === 0) {
+       return 1;
+     }
+     // Then alphabetical
+     if (item1 < item2) {
+       return -1;
+     }
+     if (item1 > item2) {
+       return 1;
+     }
+     return 0;
+   });
+   // Return the max size
+   if (maxResults) {
+     return results.slice(0, maxResults);
+   }
+   return results;
 };
 
 exports.parkingLots = parkingLots;
